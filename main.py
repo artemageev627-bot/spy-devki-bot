@@ -5,7 +5,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
 from aiogram import F
 
-TOKEN = "8520367789:AAEWveincfCFZ7KrSPPzfiY0TCNvzR6XIho"
+TOKEN = "ТВОЙ_ТОКЕН"
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
@@ -29,15 +29,19 @@ def players_keyboard():
 
 @dp.message(Command("start"))
 async def start(message: types.Message):
-    await message.answer("🎮 Игра «Шпион»\n\nВыбери количество игроков:",
-                         reply_markup=players_keyboard())
+    await message.answer(
+        "🎮 Игра «Шпион»\n\nВыбери количество игроков:",
+        reply_markup=players_keyboard()
+    )
 
 @dp.callback_query(F.data.startswith("players_"))
 async def set_players(callback: types.CallbackQuery):
+    await callback.answer()
     count = int(callback.data.split("_")[1])
     games[callback.message.chat.id] = {"players_count": count, "players": []}
+
     await callback.message.answer(
-        f"👥 Игроков: {count}\nНажмите «Я игрок»",
+        f"👥 Игроков: {count}\n\nНажмите «Я игрок»",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="🙋 Я игрок", callback_data="join")]
         ])
@@ -45,23 +49,32 @@ async def set_players(callback: types.CallbackQuery):
 
 @dp.callback_query(F.data == "join")
 async def join_game(callback: types.CallbackQuery):
-    game = games.get(callback.message.chat.id)
+    await callback.answer()
+    chat_id = callback.message.chat.id
     uid = callback.from_user.id
-    if game and uid not in game["players"]:
+    game = games.get(chat_id)
+
+    if not game:
+        return
+
+    if uid not in game["players"]:
         game["players"].append(uid)
-        if len(game["players"]) == game["players_count"]:
-            await start_game(callback.message.chat.id)
+        await callback.message.answer("✅ Ты в игре")
+
+    if len(game["players"]) == game["players_count"]:
+        await start_game(chat_id)
 
 async def start_game(chat_id):
     players = games[chat_id]["players"]
     spy = random.choice(players)
-    char = random.choice(CHARACTERS)
+    character = random.choice(CHARACTERS)
 
     for uid in players:
-        await bot.send_message(
-            uid,
-            "🕵️ Ты — ШПИОН" if uid == spy else f"🎭 Персонаж: {char}"
-        )
+        if uid == spy:
+            text = "🕵️ Ты — ШПИОН"
+        else:
+            text = f"🎭 Персонаж: **{character}**"
+        await bot.send_message(uid, text, parse_mode="Markdown")
 
     await bot.send_message(chat_id, "🎲 Игра началась!")
 
