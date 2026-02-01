@@ -1,8 +1,8 @@
+import random
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, ContextTypes
-import random
 
-# Список персонажей
+# Персонажи
 characters = [
     "Арина Дементьева", "Алина Андриянова", "Руся", "Де линт", "Арина Бетхер",
     "Дуся", "Шутова", "Изобэйнал", "Елена Максимовна", "Марина Юрьевна",
@@ -10,13 +10,13 @@ characters = [
     "Тамара", "Шилова", "Татьяна Геннадьевна", "Муравьева", "Хасанова", "Алина Кузнецова"
 ]
 
-# Переменные для игры
+# Переменные игры
 players = []
 roles = {}
 player_order = []
 current_player_index = 0
 
-# Старт игры, выбор количества игроков
+# Стартовая команда /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("3 игрока", callback_data="3"),
@@ -28,7 +28,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Выберите количество игроков:", reply_markup=reply_markup)
 
-# Назначение ролей
+# Выбор количества игроков и назначение ролей
 async def choose_players(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global players, roles, player_order, current_player_index
     query = update.callback_query
@@ -41,7 +41,6 @@ async def choose_players(update: Update, context: ContextTypes.DEFAULT_TYPE):
     character = random.choice(characters)
 
     roles = {player: ("Шпион" if player == spy else character) for player in players}
-
     player_order = players.copy()
     current_player_index = 0
 
@@ -50,7 +49,7 @@ async def choose_players(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(f"Роли назначены! Игрок {player_order[current_player_index]}, нажмите 'Узнать роль'.", reply_markup=reply_markup)
 
-# Показ роли текущему игроку
+# Показ роли игроку
 async def reveal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global current_player_index
     query = update.callback_query
@@ -59,7 +58,7 @@ async def reveal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     player = player_order[current_player_index]
     role = roles[player]
 
-    # Показ роли
+    # Показ роли текущему игроку
     await query.edit_message_text(f"{player}, твоя роль: {role}")
 
     # Кнопка скрыть роль
@@ -67,7 +66,7 @@ async def reveal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.message.reply_text("Когда запомнил роль, нажми 'Скрыть роль'", reply_markup=reply_markup)
 
-# Переход к следующему игроку или финал
+# Переход к следующему игроку или финалу
 async def hide(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global current_player_index
     query = update.callback_query
@@ -75,17 +74,15 @@ async def hide(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     current_player_index += 1
     if current_player_index < len(player_order):
-        # Кнопка для следующего игрока
         keyboard = [[InlineKeyboardButton("Узнать роль", callback_data="reveal")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text(f"Игрок {player_order[current_player_index]}, нажмите 'Узнать роль'", reply_markup=reply_markup)
     else:
-        # Все посмотрели роли, показать кнопку для финального списка
         keyboard = [[InlineKeyboardButton("Показать все роли", callback_data="show_all")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await query.edit_message_text("Все игроки посмотрели свои роли.", reply_markup=reply_markup)
 
-# Показ всех ролей в конце
+# Показ всех ролей
 async def show_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -94,6 +91,7 @@ async def show_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text(f"Все роли:\n{all_roles}")
 
 if __name__ == "__main__":
+    # Вставь свой токен вместо "YOUR_BOT_TOKEN_HERE"
     app = ApplicationBuilder().token("8520367789:AAEWveincfCFZ7KrSPPzfiY0TCNvzR6XIho").build()
 
     app.add_handler(CommandHandler("start", start))
