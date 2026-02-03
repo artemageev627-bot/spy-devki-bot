@@ -2,7 +2,6 @@ import random
 import asyncio
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 BOT_TOKEN = "8520367789:AAEWveincfCFZ7KrSPPzfiY0TCNvzR6XIho"
@@ -21,21 +20,25 @@ players = []
 roles = {}
 order = []
 current = 0
-last_role_message_id = None
 mode = None
 
+last_role_message_id = None
+last_turn_message_id = None
 
-# /start
-@dp.message(Command("start"))
-async def start(message: types.Message):
+
+def players_keyboard():
     kb = InlineKeyboardBuilder()
     for i in range(3, 8):
         kb.button(text=f"{i} игроков", callback_data=f"players_{i}")
     kb.adjust(2)
-    await message.answer("Выбери количество игроков:", reply_markup=kb.as_markup())
+    return kb.as_markup()
 
 
-# выбор количества игроков
+@dp.message(Command("start"))
+async def start(message: types.Message):
+    await message.answer("Выбери количество игроков:", reply_markup=players_keyboard())
+
+
 @dp.callback_query(lambda c: c.data.startswith("players_"))
 async def choose_players(call: types.CallbackQuery):
     global players
@@ -55,10 +58,9 @@ async def choose_players(call: types.CallbackQuery):
     await call.answer()
 
 
-# выбор режима
 @dp.callback_query(lambda c: c.data.startswith("mode_"))
 async def choose_mode(call: types.CallbackQuery):
-    global roles, order, current, mode
+    global roles, order, current, mode, last_turn_message_id
     mode = call.data
     current = 0
     order = players.copy()
@@ -83,21 +85,32 @@ async def choose_mode(call: types.CallbackQuery):
 
     kb = InlineKeyboardBuilder()
     kb.button(text="Узнать роль", callback_data="reveal")
-    await call.message.edit_text(
+
+    msg = await call.message.edit_text(
         f"Игрок {order[current]}, нажми «Узнать роль»",
         reply_markup=kb.as_markup()
     )
+    last_turn_message_id = msg.message_id
     await call.answer()
 
 
-# показать роль
 @dp.callback_query(lambda c: c.data == "reveal")
 async def reveal(call: types.CallbackQuery):
     global last_role_message_id
+
+    # 🔥 удаляем сообщение "твой ход"
+    try:
+        await bot.delete_message(call.message.chat.id, last_turn_message_id)
+    except:
+        pass
+
     player = order[current]
     role = roles[player]
 
-    msg = await call.message.answer(f"{player}, твоя роль:\n\n**{role}**", parse_mode="Markdown")
+    msg = await call.message.answer(
+        f"{player}, твоя роль:\n\n<b>{role}</b>",
+        parse_mode="HTML"
+    )
     last_role_message_id = msg.message_id
 
     kb = InlineKeyboardBuilder()
@@ -106,10 +119,9 @@ async def reveal(call: types.CallbackQuery):
     await call.answer()
 
 
-# скрыть роль
 @dp.callback_query(lambda c: c.data == "hide")
 async def hide(call: types.CallbackQuery):
-    global current
+    global current, last_turn_message_id
 
     # 🔥 удаляем сообщение с ролью
     try:
@@ -122,22 +134,28 @@ async def hide(call: types.CallbackQuery):
 
     if current < len(order):
         kb.button(text="Узнать роль", callback_data="reveal")
-        await call.message.edit_text(
+        msg = await call.message.edit_text(
             f"Игрок {order[current]}, твой ход",
             reply_markup=kb.as_markup()
         )
+        last_turn_message_id = msg.message_id
     else:
         kb.button(text="Показать все роли", callback_data="all")
-        await call.message.edit_text("Все посмотрели роли.", reply_markup=kb.as_markup())
+        await call.message.edit_text("Все игроки посмотрели роли.", reply_markup=kb.as_markup())
 
     await call.answer()
 
 
-# показать все роли
 @dp.callback_query(lambda c: c.data == "all")
 async def show_all(call: types.CallbackQuery):
     text = "\n".join([f"{p}: {r}" for p, r in roles.items()])
     await call.message.edit_text("Роли:\n\n" + text)
+
+    # 🔁 новая игра
+    await call.message.answer(
+        "Хочешь сыграть ещё раз?",
+        reply_markup=players_keyboard()
+    )
     await call.answer()
 
 
